@@ -20,6 +20,13 @@ class ItemView(ItemCreate):
     active: bool
 
 
+class ItemPage(BaseModel):
+    items: list[ItemView]
+    total: int
+    limit: int
+    offset: int
+
+
 class WarehouseCreate(BaseModel):
     code: Code
     name: Name

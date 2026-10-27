@@ -5,7 +5,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from inventory.app import create_app
-from inventory.catalog import create_item, create_warehouse, items, warehouses
+from inventory.catalog import all_items, create_item, create_warehouse, warehouses
 from inventory.database import Base, make_engine, make_sessions
 from inventory.errors import Conflict, NotFound
 from inventory.models import Movement, Stock
@@ -43,7 +43,7 @@ def test_database_survives_application_restart(tmp_path):
         assert created.status_code == 201
         assert created.json()["id"] == 1
     with TestClient(create_app(url)) as client:
-        assert client.get("/items").json() == [
+        assert client.get("/items").json()["items"] == [
             {"id": 1, "sku": "A", "name": "Sample", "active": True}
         ]
         second = client.post("/items", json={"sku": "B", "name": "Other"})
@@ -54,8 +54,8 @@ def test_application_instances_do_not_share_memory():
     with TestClient(create_app("sqlite://")) as first:
         with TestClient(create_app("sqlite://")) as second:
             first.post("/items", json={"sku": "A", "name": "Sample"})
-            assert len(first.get("/items").json()) == 1
-            assert second.get("/items").json() == []
+            assert len(first.get("/items").json()["items"]) == 1
+            assert second.get("/items").json()["items"] == []
 
 
 def test_catalog_conflict_rolls_back_session(session):
@@ -64,7 +64,7 @@ def test_catalog_conflict_rolls_back_session(session):
         create_item(session, "BOX", "Duplicate")
     created = create_item(session, "BAG", "Sample bag")
     assert created.id == 2
-    assert [row.sku for row in items(session)] == ["BOX", "BAG"]
+    assert [row.sku for row in all_items(session)] == ["BOX", "BAG"]
 
 
 def test_warehouse_conflict_rolls_back_session(session):
@@ -157,7 +157,7 @@ def test_balance_order_is_warehouse_then_item(session):
 def test_catalog_primary_keys_do_not_depend_on_sku_sort(session):
     create_item(session, "Z", "Last alphabetically")
     create_item(session, "A", "First alphabetically")
-    assert [row.sku for row in items(session)] == ["Z", "A"]
+    assert [row.sku for row in all_items(session)] == ["Z", "A"]
 
 
 def test_foreign_keys_reject_orphan_stock(session):

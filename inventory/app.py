@@ -2,7 +2,7 @@
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse
 
 from . import catalog, stock
@@ -10,6 +10,7 @@ from .database import Base, make_engine, make_sessions
 from .errors import Conflict, NotFound
 from .schemas import (
     ItemCreate,
+    ItemPage,
     ItemView,
     MoveCreate,
     MoveView,
@@ -48,10 +49,13 @@ def create_app(url: str = "sqlite:///inventory.db") -> FastAPI:
         with sessions() as session:
             return catalog.create_item(session, body.sku, body.name)
 
-    @app.get("/items", response_model=list[ItemView])
-    def list_items():
+    @app.get("/items", response_model=ItemPage)
+    def list_items(
+        limit: int = Query(default=25, ge=1, le=100),
+        offset: int = Query(default=0, ge=0),
+    ):
         with sessions() as session:
-            return catalog.items(session)
+            return catalog.items_page(session, limit=limit, offset=offset)
 
     @app.post("/warehouses", response_model=WarehouseView, status_code=201)
     def add_warehouse(body: WarehouseCreate):
@@ -76,6 +80,6 @@ def create_app(url: str = "sqlite:///inventory.db") -> FastAPI:
     @app.get("/v1/items", response_model=list[ItemView], deprecated=True)
     def legacy_items():
         with sessions() as session:
-            return catalog.items(session)
+            return catalog.all_items(session)
 
     return app
