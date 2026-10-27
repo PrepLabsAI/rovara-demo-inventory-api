@@ -20,7 +20,8 @@ def seed(client):
 
 def test_health_and_empty_catalog(client):
     assert client.get("/health").json() == {"status": "ok"}
-    for path in ["/items", "/warehouses", "/stock", "/v1/items"]:
+    assert client.get("/items").json() == {"items": [], "total": 0, "limit": 25, "offset": 0}
+    for path in ["/warehouses", "/stock", "/v1/items"]:
         assert client.get(path).json() == []
 
 
@@ -28,8 +29,8 @@ def test_catalog_unique_and_sorted(client):
     seed(client)
     assert client.post("/items", json={"sku": "BOX-1", "name": "Other"}).status_code == 409
     assert client.post("/warehouses", json={"code": "NORTH", "name": "Other"}).status_code == 409
-    assert client.get("/items").json()[0]["name"] == "Sample box"
-    assert client.get("/v1/items").json() == client.get("/items").json()
+    assert client.get("/items").json()["items"][0]["name"] == "Sample box"
+    assert client.get("/v1/items").json() == client.get("/items").json()["items"]
     assert client.get("/warehouses").json()[0]["code"] == "NORTH"
 
 
@@ -66,13 +67,31 @@ def test_move_rejections(client):
 )
 def test_invalid_items(client, body):
     assert client.post("/items", json=body).status_code == 422
-    assert client.get("/items").json() == []
+    assert client.get("/items").json()["items"] == []
 
 
 @pytest.mark.parametrize("delta", [1.5, "2", True, 100001, -100001])
 def test_strict_quantity_validation(client, delta):
     data = seed(client)
     assert client.post("/moves", json={**data, "delta": delta}).status_code == 422
+
+
+def test_items_pagination(client):
+    for i in range(5):
+        client.post("/items", json={"sku": f"BOX-{i}", "name": f"Box {i}"})
+    r = client.get("/items?limit=2&offset=0").json()
+    assert r["total"] == 5
+    assert len(r["items"]) == 2
+    assert r["limit"] == 2
+    assert r["offset"] == 0
+    r2 = client.get("/items?limit=2&offset=4").json()
+    assert len(r2["items"]) == 1
+
+
+def test_items_pagination_validation(client):
+    assert client.get("/items?limit=0").status_code == 422
+    assert client.get("/items?limit=101").status_code == 422
+    assert client.get("/items?offset=-1").status_code == 422
 
 
 def test_invalid_warehouse_and_reason(client):

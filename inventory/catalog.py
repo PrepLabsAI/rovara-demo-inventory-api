@@ -1,6 +1,6 @@
 """Catalog access; callers own the request-scoped session."""
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 
 from .errors import Conflict
@@ -18,8 +18,16 @@ def create_item(session, sku: str, name: str):
     return row
 
 
-def items(session):
+def all_items(session):
     return session.scalars(select(Item).order_by(Item.id)).all()
+
+
+def items_page(session, limit: int = 25, offset: int = 0):
+    total = session.scalar(select(func.count()).select_from(Item))
+    rows = session.scalars(
+        select(Item).order_by(Item.id).limit(limit).offset(offset)
+    ).all()
+    return {"items": rows, "total": total, "limit": limit, "offset": offset}
 
 
 def create_warehouse(session, code: str, name: str):
