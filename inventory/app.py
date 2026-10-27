@@ -2,7 +2,7 @@
 
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Query, Request
 from fastapi.responses import JSONResponse
 
 from . import catalog, stock
@@ -49,9 +49,12 @@ def create_app(url: str = "sqlite:///inventory.db") -> FastAPI:
             return catalog.create_item(session, body.sku, body.name)
 
     @app.get("/items", response_model=list[ItemView])
-    def list_items():
+    def list_items(
+        limit: int = Query(default=50, ge=1, le=200),
+        offset: int = Query(default=0, ge=0),
+    ):
         with sessions() as session:
-            return catalog.items(session)
+            return catalog.items(session, limit=limit, offset=offset)
 
     @app.post("/warehouses", response_model=WarehouseView, status_code=201)
     def add_warehouse(body: WarehouseCreate):

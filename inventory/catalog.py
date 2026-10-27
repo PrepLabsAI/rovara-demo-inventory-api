@@ -18,8 +18,11 @@ def create_item(session, sku: str, name: str):
     return row
 
 
-def items(session):
-    return session.scalars(select(Item).order_by(Item.id)).all()
+def items(session, limit: int | None = None, offset: int = 0):
+    q = select(Item).order_by(Item.id)
+    if limit is not None:
+        q = q.limit(limit).offset(offset)
+    return session.scalars(q).all()
 
 
 def create_warehouse(session, code: str, name: str):
