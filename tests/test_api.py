@@ -81,6 +81,91 @@ def test_invalid_warehouse_and_reason(client):
     assert client.post("/moves", json={**data, "delta": 1, "reason": " "}).status_code == 422
 
 
+def seed_n_items(client, n):
+    for i in range(1, n + 1):
+        client.post("/items", json={"sku": f"SKU-{i:03}", "name": f"Item {i}"})
+
+
+# alone – defaults return all items when count <= default limit
+def test_items_pagination_defaults(client):
+    seed_n_items(client, 3)
+    assert len(client.get("/items").json()) == 3
+
+
+# limit alone
+def test_items_limit(client):
+    seed_n_items(client, 5)
+    assert len(client.get("/items?limit=2").json()) == 2
+
+
+# offset alone
+def test_items_offset(client):
+    seed_n_items(client, 5)
+    assert len(client.get("/items?offset=3").json()) == 2
+
+
+# limit + offset combined
+def test_items_limit_and_offset(client):
+    seed_n_items(client, 5)
+    items = client.get("/items?limit=2&offset=2").json()
+    assert len(items) == 2
+    assert items[0]["sku"] == "SKU-003"
+
+
+# offset beyond end
+def test_items_offset_beyond_end(client):
+    seed_n_items(client, 3)
+    assert client.get("/items?offset=100").json() == []
+
+
+# boundary: limit=1 (minimum)
+def test_items_limit_boundary_min(client):
+    seed_n_items(client, 3)
+    assert len(client.get("/items?limit=1").json()) == 1
+
+
+# boundary: limit=200 (maximum)
+def test_items_limit_boundary_max(client):
+    seed_n_items(client, 3)
+    assert len(client.get("/items?limit=200").json()) == 3
+
+
+# boundary: one below minimum
+def test_items_limit_too_low(client):
+    assert client.get("/items?limit=0").status_code == 422
+
+
+# boundary: one above maximum
+def test_items_limit_too_high(client):
+    assert client.get("/items?limit=201").status_code == 422
+
+
+def test_items_offset_negative(client):
+    assert client.get("/items?offset=-1").status_code == 422
+
+
+def test_items_limit_float(client):
+    assert client.get("/items?limit=1.5").status_code == 422
+
+
+def test_items_limit_bool(client):
+    assert client.get("/items?limit=true").status_code == 422
+
+
+# legacy route ignores limit/offset params (FastAPI passes unknowns silently)
+def test_items_legacy_ignores_pagination(client):
+    seed_n_items(client, 3)
+    assert len(client.get("/v1/items").json()) == 3
+    assert len(client.get("/v1/items?limit=1").json()) == 3
+
+
+# regression: legacy route must return every item when catalog > default limit
+def test_legacy_items_returns_all_beyond_default_limit(client):
+    seed_n_items(client, 55)
+    assert len(client.get("/v1/items").json()) == 55
+    assert len(client.get("/items").json()) == 50
+
+
 def test_stock_audit_matches_quantity():
     from sqlalchemy import select
 
