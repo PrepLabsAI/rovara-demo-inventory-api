@@ -1,3 +1,4 @@
+<!-- Rovara 0.5.13 test -->
 # Sample Inventory
 
 A local warehouse catalog and immutable stock ledger. Python 3.12, FastAPI,
