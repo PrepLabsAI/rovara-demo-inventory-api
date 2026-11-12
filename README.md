@@ -40,3 +40,4 @@ exercise HTTP validation, persistence, filtering, audit order and rollback.
 Coverage must reach 75%. The app factory deliberately repeats session scopes:
 TODO consider a shared dependency when additional route groups are introduced.
 MIT licensed.
+Tested by Rovara 0.5.14
